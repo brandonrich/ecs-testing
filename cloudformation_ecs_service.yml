@@ -18,7 +18,7 @@ Resources:
   MyECSCluster:
     Type: 'AWS::ECS::Cluster'
     Properties:
-      ClusterName: my-nginx-cluster
+      ClusterName: !Sub '${AWS::StackName}-cluster'
 
   MyECSTaskExecutionRole:
     Type: 'AWS::IAM::Role'
@@ -34,7 +34,7 @@ Resources:
               - 'sts:AssumeRole'
       Path: /
       Policies:
-        - PolicyName: AmazonECSTaskExecutionRolePolicy
+        - PolicyName: !Sub '${AWS::StackName}-ECSTaskExecutionRolePolicy'
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -85,7 +85,7 @@ Resources:
   MyTargetGroup:
     Type: 'AWS::ElasticLoadBalancingV2::TargetGroup' 
     Properties:
-      Name: my-nginx-targetgroup  
+      Name: !Sub '${AWS::StackName}-targetgroup'  
       Port: 80
       Protocol: HTTP
       VpcId: !Ref VpcId
@@ -94,7 +94,7 @@ Resources:
   MyECSTaskDefinition:
     Type: 'AWS::ECS::TaskDefinition'
     Properties:
-      Family: my-nginx-task
+      Family: !Sub '${AWS::StackName}-task'
       Cpu: '256'
       Memory: '512'
       NetworkMode: awsvpc
@@ -116,14 +116,14 @@ Resources:
   MyLogGroup:
     Type: 'AWS::Logs::LogGroup'
     Properties:
-      LogGroupName: my-nginx-log-group
+      LogGroupName: !Sub '${AWS::StackName}-log-group'
 
   MyECSService:
     Type: 'AWS::ECS::Service'
     DependsOn:
          - MyLoadBalancerListener # necessary to avoid a condition where the target group is not finished yet
     Properties:
-      ServiceName: my-nginx-service
+      ServiceName: !Sub '${AWS::StackName}-service'
       Cluster: !Ref MyECSCluster
       TaskDefinition: !Ref MyECSTaskDefinition
       DesiredCount: 1
