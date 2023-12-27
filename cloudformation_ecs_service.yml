@@ -1,0 +1,140 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  VpcId:
+    Type: 'AWS::EC2::VPC::Id'
+    Description: The VPC Id
+
+  SubnetIds:
+    Type: 'List<AWS::EC2::Subnet::Id>'
+    Description: The list of Subnet Ids
+
+  Image:
+    Type: String
+    Description: The Docker image to deploy
+    Default: 031878740168.dkr.ecr.us-east-1.amazonaws.com/my-nginx-repo:latest
+    # Example: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/my-nginx-repo:latest'
+
+Resources:
+  MyECSCluster:
+    Type: 'AWS::ECS::Cluster'
+    Properties:
+      ClusterName: my-nginx-cluster
+
+  MyECSTaskExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: AmazonECSTaskExecutionRolePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ecs:UpdateService'
+                  - 'ecs:DescribeServices'
+                  - 'ecs:DescribeTaskDefinition'
+                  - 'ecs:DescribeTasks'
+                  - 'ecs:ListTasks'
+                  - 'ecr:GetAuthorizationToken'
+                  - 'ecr:BatchCheckLayerAvailability'
+                  - 'ecr:GetDownloadUrlForLayer'
+                  - 'ecr:BatchGetImage'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'      
+
+  MyECSSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Security Group for ECS service
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  MyLoadBalancer:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      Name: my-nginx-alb
+      Subnets: !Ref SubnetIds
+      SecurityGroups: 
+        - !GetAtt MyECSSecurityGroup.GroupId
+
+  MyLoadBalancerListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref MyTargetGroup
+      LoadBalancerArn: !Ref MyLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  MyTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup' 
+    Properties:
+      Name: my-nginx-targetgroup  
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref VpcId
+      TargetType: ip
+
+  MyECSTaskDefinition:
+    Type: 'AWS::ECS::TaskDefinition'
+    Properties:
+      Family: my-nginx-task
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !Ref MyECSTaskExecutionRole
+      ContainerDefinitions:
+        - Name: my-nginx-container
+          Image: !Ref Image
+          PortMappings:
+            - ContainerPort: 80
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref MyLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: my-nginx
+
+  MyLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: my-nginx-log-group
+
+  MyECSService:
+    Type: 'AWS::ECS::Service'
+    DependsOn:
+         - MyLoadBalancerListener # necessary to avoid a condition where the target group is not finished yet
+    Properties:
+      ServiceName: my-nginx-service
+      Cluster: !Ref MyECSCluster
+      TaskDefinition: !Ref MyECSTaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: !Ref SubnetIds
+          SecurityGroups: 
+            - !Ref MyECSSecurityGroup
+      LoadBalancers:
+        - TargetGroupArn: !Ref MyTargetGroup
+          ContainerName: my-nginx-container
+          ContainerPort: 80            
