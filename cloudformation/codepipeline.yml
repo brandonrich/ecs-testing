@@ -164,7 +164,7 @@ Resources:
                   - ecs:ListTasks
                   - ecs:RegisterTaskDefinition
                   - ecs:UpdateService
-                Resource: arn:aws:ecs:us-east-1:031878740168:service/bmr-ecs-cluster-cluster/bmr-ecs-cluster-service          
+                Resource: '*'
               - Effect: Allow
                 Action:
                   - ecr:GetDownloadUrlForLayer
