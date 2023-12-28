@@ -158,12 +158,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - ecs:DescribeServices
-                  - ecs:DescribeTaskDefinition
-                  - ecs:DescribeTasks
-                  - ecs:ListTasks
-                  - ecs:RegisterTaskDefinition
-                  - ecs:UpdateService
+                  - ecs:*
                 Resource: '*'
               - Effect: Allow
                 Action:
